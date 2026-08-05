@@ -1,54 +1,35 @@
-import React, { useState, useEffect } from 'react';
-import { auth } from './firebase';
-import { onAuthStateChanged } from 'firebase/auth';
+import React, { useState } from 'react';
 import Login from './pages/login';
 import Dashboard from './pages/Dashboard';
+import AdminPanel from './pages/AdminPanel';
 
 export default function App() {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [userRole, setUserRole] = useState(null); // 'admin', 'seller' veya null
 
-  // Firebase Oturum Durumunu Dinle
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-      setLoading(false);
-    });
+  // Başarılı Giriş Yapıldığında
+  const handleLoginSuccess = (role) => {
+    setUserRole(role);
+  };
 
-    return () => unsubscribe();
-  }, []);
+  // Çıkış Yapıldığında
+  const handleLogout = () => {
+    setUserRole(null);
+  };
 
-  // Yüklenme Aşaması
-  if (loading) {
-    return (
-      <div style={styles.loadingContainer}>
-        <div style={styles.spinner}>🍃</div>
-        <p style={{ color: '#64748b', fontWeight: 'bold' }}>Doğalım Şarküteri Panel Yükleniyor...</p>
-      </div>
-    );
+  // 1. KULLANICI GİRİŞ YAPMAMIŞSA -> TERÇİH BUTONLU GİRİŞ EKRANI
+  if (!userRole) {
+    return <Login onLoginSuccess={handleLoginSuccess} />;
   }
 
-  // Oturum Durumuna Göre Yönlendirme
-  return (
-    <div>
-      {user ? <Dashboard /> : <Login />}
-    </div>
-  );
+  // 2. KULLANICI ADMIN İSE -> ADMIN VE SAHA ONAY PANELİ
+  if (userRole === 'admin') {
+    return <AdminPanel onLogout={handleLogout} />;
+  }
+
+  // 3. KULLANICI ŞARKÜTERİ SATICISI İSE -> STANDART ŞARKÜTERİ DASHBOARD
+  if (userRole === 'seller') {
+    return <Dashboard onLogout={handleLogout} />;
+  }
+
+  return null;
 }
-
-const styles = {
-  loadingContainer: {
-    height: '100vh',
-    display: 'flex',
-    flexDirection: 'column',
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f8fafc',
-    fontFamily: "'Inter', sans-serif"
-  },
-  spinner: {
-    fontSize: '3rem',
-    marginBottom: '1rem',
-    animation: 'pulse 1.5s infinite'
-  }
-};
