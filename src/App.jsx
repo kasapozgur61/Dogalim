@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from './firebase';
-import Login from './pages/Login';
+import { onAuthStateChanged } from 'firebase/auth';
+import Login from './pages/login';
 import Dashboard from './pages/Dashboard';
 
 export default function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // Firebase Oturum Durumunu Dinle
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
@@ -17,17 +18,37 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
+  // Yüklenme Aşaması
   if (loading) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', fontFamily: 'sans-serif', color: '#64748b' }}>
-        Yükleniyor...
+      <div style={styles.loadingContainer}>
+        <div style={styles.spinner}>🍃</div>
+        <p style={{ color: '#64748b', fontWeight: 'bold' }}>Doğalım Şarküteri Panel Yükleniyor...</p>
       </div>
     );
   }
 
+  // Oturum Durumuna Göre Yönlendirme
   return (
     <div>
       {user ? <Dashboard /> : <Login />}
     </div>
   );
 }
+
+const styles = {
+  loadingContainer: {
+    height: '100vh',
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f8fafc',
+    fontFamily: "'Inter', sans-serif"
+  },
+  spinner: {
+    fontSize: '3rem',
+    marginBottom: '1rem',
+    animation: 'pulse 1.5s infinite'
+  }
+};
