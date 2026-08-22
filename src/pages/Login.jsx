@@ -1,15 +1,14 @@
 import React, { useState } from 'react';
 import { auth, googleProvider, db } from '../firebase';
 import { signInWithPopup, signInWithEmailAndPassword } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 export default function Login({ onLoginSuccess }) {
-  // 'seller_login', 'seller_apply', 'admin_login', 'pending'
   const [activeTab, setActiveTab] = useState('seller_login');
-
-  // Satıcı & Admin Giriş Formu
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
+  const [loading, setLoading] = useState(false);
 
   // Şarküteri Ön Başvuru Formu
   const [applyForm, setApplyForm] = useState({
@@ -26,53 +25,63 @@ export default function Login({ onLoginSuccess }) {
     appointmentTime: '10:00'
   });
 
-  const [errorMsg, setErrorMsg] = useState('');
-
-  // Firestore'dan Kullanıcı Rolünü Sorgulayan Güvenli Fonksiyon
-  const checkUserRoleAndLogin = async (user) => {
+  // Rol Kontrolü ve Başarılı Giriş Yönlendirmesi
+  const processUserLogin = async (user) => {
     try {
+      // 1. Firestore'dan kullanıcı rolünü çekmeyi dene
       const userDocRef = doc(db, 'users', user.uid);
       const userSnap = await getDoc(userDocRef);
 
       if (userSnap.exists()) {
-        const userData = userSnap.data();
-        onLoginSuccess(userData.role || 'seller', 'approved');
+        const data = userSnap.data();
+        onLoginSuccess(data.role || 'seller', data.status || 'approved');
       } else {
-        // Firestore'da henüz kayıt yoksa varsayılan olarak satıcı paneline al
+        // Firestore'da kayıt yoksa varsayılan olarak satıcı yetkisiyle içeri al
         onLoginSuccess('seller', 'approved');
       }
-    } catch (error) {
-      console.error("Rol okuma hatası:", error);
+    } catch (err) {
+      console.warn("Firestore rol okuma hatası (Varsayılan satıcı yetkisiyle giriliyor):", err);
+      // Firestore kuralları kapalı olsa bile kullanıcının içeri girmesini sağla
       onLoginSuccess('seller', 'approved');
+    } finally {
+      setLoading(false);
     }
   };
 
-  // E-Posta / Şifre ile Giriş (Satıcı & Admin Ortak Mantığı)
+  // E-Posta / Şifre Girişi
   const handleEmailLogin = async (e) => {
     e.preventDefault();
     setErrorMsg('');
+    setLoading(true);
+
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      await checkUserRoleAndLogin(userCredential.user);
+      await processUserLogin(userCredential.user);
     } catch (error) {
       console.error("Giriş Hatası:", error);
       setErrorMsg('Giriş başarısız! E-posta veya şifrenizi kontrol edin.');
+      setLoading(false);
     }
   };
 
-  // 🌐 Google ile Devam Et
+  // 🌐 Google ile Giriş
   const handleGoogleSignIn = async () => {
     setErrorMsg('');
+    setLoading(true);
+
     try {
       const result = await signInWithPopup(auth, googleProvider);
-      await checkUserRoleAndLogin(result.user);
+      if (result && result.user) {
+        await processUserLogin(result.user);
+      }
     } catch (error) {
       console.error("Google Giriş Hatası:", error);
-      setErrorMsg('Google ile giriş yapılırken bir hata oluştu veya pencere kapatıldı.');
+      setErrorMsg('Google ile giriş yapılırken bir sorun oluştu veya pencere kapatıldı.');
+      setLoading(false);
     }
   };
 
-  // Şarküteri Ön Başvuru Gönderimi
+  // Şarküteri Ön Başvuru
   const handleApplySubmit = (e) => {
     e.preventDefault();
     setErrorMsg('');
@@ -88,7 +97,7 @@ export default function Login({ onLoginSuccess }) {
     }
 
     if (!applyForm.appointmentDate) {
-      setErrorMsg('Lütfen saha ekibi ziyareti için randevu tarihi seçin.');
+      setErrorMsg('Lütfen saha ziyareti için randevu tarihi seçin.');
       return;
     }
 
@@ -106,24 +115,18 @@ export default function Login({ onLoginSuccess }) {
           <p style={styles.subtitle}>Saha & Şarküteri Yönetim Portalı</p>
         </div>
 
-        {/* GİRİŞ TİPİ SEÇİM SEKMELERİ */}
+        {/* GİRİŞ SEKMELERİ */}
         {activeTab !== 'pending' && (
           <div style={styles.tabContainer}>
             <button 
               onClick={() => { setActiveTab('seller_login'); setErrorMsg(''); }}
-              style={{
-                ...styles.tabBtn,
-                ...(activeTab.startsWith('seller') ? styles.activeTab : {})
-              }}
+              style={{ ...styles.tabBtn, ...(activeTab === 'seller_login' ? styles.activeTab : {}) }}
             >
-              🏪 Şarküteri Satıcı
+              🏪 Şarküteri Girişi
             </button>
             <button 
               onClick={() => { setActiveTab('admin_login'); setErrorMsg(''); }}
-              style={{
-                ...styles.tabBtn,
-                ...(activeTab === 'admin_login' ? styles.activeAdminTab : {})
-              }}
+              style={{ ...styles.tabBtn, ...(activeTab === 'admin_login' ? styles.activeAdminTab : {}) }}
             >
               🛡️ Yönetim (Admin)
             </button>
@@ -159,13 +162,18 @@ export default function Login({ onLoginSuccess }) {
               />
             </div>
 
-            <button type="submit" style={styles.submitBtn}>
-              Şarküteri Paneline Giriş Yap
+            <button type="submit" disabled={loading} style={styles.submitBtn}>
+              {loading ? 'Giriş Yapılıyor...' : 'Şarküteri Paneline Giriş Yap'}
             </button>
 
             <div style={styles.divider}>veya</div>
 
-            <button type="button" onClick={handleGoogleSignIn} style={styles.googleBtn}>
+            <button 
+              type="button" 
+              onClick={handleGoogleSignIn} 
+              disabled={loading} 
+              style={styles.googleBtn}
+            >
               🌐 Google ile Devam Et
             </button>
 
@@ -207,13 +215,18 @@ export default function Login({ onLoginSuccess }) {
               />
             </div>
 
-            <button type="submit" style={styles.adminSubmitBtn}>
-              Admin Paneline Giriş Yap
+            <button type="submit" disabled={loading} style={styles.adminSubmitBtn}>
+              {loading ? 'Doğrulanıyor...' : 'Admin Paneline Giriş Yap'}
             </button>
 
             <div style={styles.divider}>veya</div>
 
-            <button type="button" onClick={handleGoogleSignIn} style={styles.googleBtn}>
+            <button 
+              type="button" 
+              onClick={handleGoogleSignIn} 
+              disabled={loading} 
+              style={styles.googleBtn}
+            >
               🌐 Google ile Admin Girişi
             </button>
           </form>
@@ -313,7 +326,7 @@ export default function Login({ onLoginSuccess }) {
                 <select 
                   value={applyForm.appointmentTime} 
                   onChange={(e) => setApplyForm({ ...applyForm, appointmentTime: e.target.value })}
-                  style={{ ...styles.input, flex: 1 }}
+                  style={{ ...styles.input, flex: 1 }} 
                 >
                   <option value="10:00">10:00 - 12:00</option>
                   <option value="14:00">14:00 - 16:00</option>

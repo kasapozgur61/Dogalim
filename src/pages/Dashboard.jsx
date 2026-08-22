@@ -5,11 +5,12 @@ import Orders from './orders';
 import Products from './products';
 import Disputes from './disputes';
 import Financials from './financials';
-import AiAssistant from './aiAssistant'; // YENİ EKLENEN AI DANIŞMAN MODÜLÜ
+import AiAssistant from './aiAssistant';
+import Logistics from './logistics'; // YENİ EKLENEN LOJİSTİK MODÜLÜ
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState('orders');
-  const [userRole, setUserRole] = useState('tezgah'); // 'tezgah' veya 'patron'
+  const [userRole, setUserRole] = useState('tezgah');
   const [showPinModal, setShowPinModal] = useState(false);
   const [pinInput, setPinInput] = useState('');
   const [pinError, setPinError] = useState(false);
@@ -64,6 +65,13 @@ export default function Dashboard() {
               style={{ ...styles.navBtn, ...(activeTab === 'orders' ? styles.activeNavBtn : {}) }}
             >
               📦 Siparişler & Tartı {userRole === 'tezgah' && '(Tezgah)'}
+            </button>
+
+            <button 
+              onClick={() => setActiveTab('logistics')} 
+              style={{ ...styles.navBtn, ...(activeTab === 'logistics' ? styles.activeNavBtn : {}) }}
+            >
+              🛵 Kurye & Lojistik
             </button>
 
             <button 
@@ -137,6 +145,7 @@ export default function Dashboard() {
           <div>
             <h1 style={styles.headerTitle}>
               {activeTab === 'orders' && "Şarküteri Operasyon & Tartı Yönetimi"}
+              {activeTab === 'logistics' && "Yerel Kurye & Soğuk Zincir Sevkiyat"}
               {activeTab === 'products' && "Yöresel Ürün & Stok Kataloğu"}
               {activeTab === 'disputes' && "Destek & Kısmi İade Yönetimi"}
               {activeTab === 'financials' && "Finansal Raporlar & Ciro Yönetimi"}
@@ -144,6 +153,7 @@ export default function Dashboard() {
             </h1>
             <p style={styles.headerSub}>
               {activeTab === 'orders' && "Siparişleri tartın, ikram ekleyin ve mutfak fişi bastırın."}
+              {activeTab === 'logistics' && "PostGIS mesafeli yerel kurye ataması ve kutu içi sıcaklık takibi."}
               {activeTab === 'products' && "Yöre bilgisi, dinlendirme süreleri ve soğuk zincir seçenekleri."}
               {activeTab === 'disputes' && "Kargo hasarları, vakum bozulmaları ve müşteri talepleri."}
               {activeTab === 'financials' && "Mağaza cirosu, hakedişler, ikram maliyetleri ve net kâr."}
@@ -164,6 +174,7 @@ export default function Dashboard() {
 
         {/* MODÜL RENDER ALANLARI */}
         {activeTab === 'orders' && <Orders userRole={userRole} />}
+        {activeTab === 'logistics' && <Logistics userRole={userRole} />}
         {activeTab === 'products' && <Products userRole={userRole} />}
         {activeTab === 'disputes' && <Disputes userRole={userRole} />}
         {activeTab === 'financials' && <Financials userRole={userRole} />}
