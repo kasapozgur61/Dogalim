@@ -1,46 +1,49 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
-export default function Disputes({ userRole = 'tezgah' }) {
-  const [disputes, setDisputes] = useState([
-    {
-      id: 'TALEP-8821',
-      customerName: 'Ahmet Yılmaz',
-      orderId: '#DG-1002',
-      productName: 'Olgunlaştırılmış Ezine Peyniri (500g)',
-      issueType: 'Vakum Salması / Koku',
-      customerNote: 'Kargo geldiğinde vakumu açılmıştı, soğuk zincir bozulmuş gibi duruyor.',
-      photoUrl: 'https://via.placeholder.com/150/ef4444/ffffff?text=Hasarli+Urun',
-      amount: 180,
-      status: 'beklemede', // beklemede, onaylandi, reddedildi
-      date: '29 Temmuz 2026'
-    },
-    {
-      id: 'TALEP-8822',
-      customerName: 'Zeynep Kaya',
-      orderId: '#DG-1001',
-      productName: 'Eski Kars Gravyeri (250g)',
-      issueType: 'Ezik / Kırık Ambalaj',
-      customerNote: 'Strafor kutu ezilmiş, paketin bir kısmı ezilerek deforme olmuş.',
-      photoUrl: 'https://via.placeholder.com/150/f59e0b/ffffff?text=Kutusu+Ezik',
-      amount: 170,
-      status: 'beklemede',
-      date: '29 Temmuz 2026'
+export default function Disputes({ userRole = 'tezgah', storeData }) {
+  const storeId = storeData?.id || 'guest';
+  const DISPUTES_KEY = `dogalim_disputes_${storeId}`;
+
+  const [disputes, setDisputes] = useState(() => {
+    try {
+      const raw = localStorage.getItem(DISPUTES_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
     }
-  ]);
+  });
+
+  useEffect(() => {
+    localStorage.setItem(DISPUTES_KEY, JSON.stringify(disputes));
+  }, [disputes, DISPUTES_KEY]);
 
   const handleAction = (id, actionType) => {
     if (userRole !== 'patron') {
-      alert("⚠️ İade ve Değişim kararlarını sadece Patron Modu onaylayabilir!");
+      alert('⚠️ İade ve Değişim kararlarını sadece Patron Modu onaylayabilir!');
       return;
     }
-
-    setDisputes(disputes.map(item => {
-      if (item.id === id) {
-        return { ...item, status: actionType };
-      }
-      return item;
-    }));
+    setDisputes(prev => prev.map(item => item.id === id ? { ...item, status: actionType } : item));
   };
+
+  if (disputes.length === 0) {
+    return (
+      <div style={styles.container}>
+        <div style={styles.header}>
+          <div>
+            <h2>🛡️ Destek & Kısmi İade Talepleri</h2>
+            <p style={styles.subText}>Kargo hasarları, vakum bozulmaları ve müşteri itiraz yönetimi.</p>
+          </div>
+        </div>
+        <div style={styles.emptyState}>
+          <span style={{ fontSize: '3rem' }}>✅</span>
+          <h3 style={{ margin: '12px 0 6px', color: '#0f172a' }}>Açık Talep Yok</h3>
+          <p style={{ color: '#64748b', fontSize: '0.88rem', maxWidth: '320px', textAlign: 'center', lineHeight: '1.5' }}>
+            Müşteri iade veya destek talepleri geldiğinde burada listelenecek.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={styles.container}>
@@ -61,11 +64,12 @@ export default function Disputes({ userRole = 'tezgah' }) {
               </div>
               <span style={{
                 ...styles.statusBadge,
-                backgroundColor: item.status === 'onaylandi' ? '#d1fae5' : item.status === 'reddedildi' ? '#fee2e2' : '#fef3c7',
-                color: item.status === 'onaylandi' ? '#065f46' : item.status === 'reddedildi' ? '#991b1b' : '#92400e',
+                backgroundColor: item.status === 'onaylandi' ? '#d1fae5' : item.status === 'reddedildi' ? '#fee2e2' : item.status === 'yeni_paket' ? '#e0f2fe' : '#fef3c7',
+                color: item.status === 'onaylandi' ? '#065f46' : item.status === 'reddedildi' ? '#991b1b' : item.status === 'yeni_paket' ? '#0369a1' : '#92400e',
               }}>
                 {item.status === 'onaylandi' && '✅ Kısmi İade Onaylandı'}
                 {item.status === 'reddedildi' && '❌ Talep Reddedildi'}
+                {item.status === 'yeni_paket' && '📦 Yeni Paket Gönderildi'}
                 {item.status === 'beklemede' && '⏳ İnceleniyor'}
               </span>
             </div>
@@ -80,7 +84,6 @@ export default function Disputes({ userRole = 'tezgah' }) {
                   Talep Edilen İade Tutarı: ₺{item.amount}
                 </p>
               </div>
-
               <div style={styles.photoSection}>
                 <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Müşteri Kanıt Görseli:</span>
                 <div style={styles.photoPlaceholder}>📷 [Fotoğraf Görüntüle]</div>
@@ -94,7 +97,7 @@ export default function Disputes({ userRole = 'tezgah' }) {
                     <button onClick={() => handleAction(item.id, 'onaylandi')} style={styles.approveBtn}>
                       💸 Kısmi İadeyi Onayla (₺{item.amount})
                     </button>
-                    <button onClick={() => handleAction(item.id, 'onaylandi')} style={styles.resendBtn}>
+                    <button onClick={() => handleAction(item.id, 'yeni_paket')} style={styles.resendBtn}>
                       📦 Ücretsiz Yeni Paket Gönder
                     </button>
                     <button onClick={() => handleAction(item.id, 'reddedildi')} style={styles.rejectBtn}>
@@ -119,6 +122,7 @@ const styles = {
   container: { display: 'flex', flexDirection: 'column', gap: '20px' },
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
   subText: { color: '#64748b', fontSize: '0.9rem', margin: '4px 0 0 0' },
+  emptyState: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff', borderRadius: '16px', border: '2px dashed #e2e8f0', padding: '60px 24px', gap: '8px' },
   list: { display: 'flex', flexDirection: 'column', gap: '16px' },
   card: { backgroundColor: '#fff', borderRadius: '12px', padding: '20px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' },
   cardHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', paddingBottom: '12px', borderBottom: '1px solid #f1f5f9' },
@@ -133,8 +137,8 @@ const styles = {
   photoSection: { display: 'flex', flexDirection: 'column', gap: '4px' },
   photoPlaceholder: { width: '130px', height: '90px', backgroundColor: '#e2e8f0', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', color: '#475569', fontWeight: 'bold', border: '1px dashed #cbd5e1' },
   cardFooter: { display: 'flex', gap: '10px', marginTop: '16px', paddingTop: '14px', borderTop: '1px solid #f1f5f9', flexWrap: 'wrap' },
-  approveBtn: { padding: '8px 14px', backgroundColor: '#10b981', color: '#fff', border: 'none', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.85rem' },
-  resendBtn: { padding: '8px 14px', backgroundColor: '#0284c7', color: '#fff', border: 'none', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.85rem' },
-  rejectBtn: { padding: '8px 14px', backgroundColor: '#ef4444', color: '#fff', border: 'none', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.85rem' },
+  approveBtn: { padding: '8px 14px', backgroundColor: '#10b981', color: '#fff', border: 'none', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.85rem', fontFamily: 'inherit' },
+  resendBtn: { padding: '8px 14px', backgroundColor: '#0284c7', color: '#fff', border: 'none', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.85rem', fontFamily: 'inherit' },
+  rejectBtn: { padding: '8px 14px', backgroundColor: '#ef4444', color: '#fff', border: 'none', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.85rem', fontFamily: 'inherit' },
   tezgahWarning: { fontSize: '0.85rem', color: '#94a3b8', fontStyle: 'italic' }
 };

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { auth } from './firebase';
 import { signOut } from 'firebase/auth';
-import Login from './pages/login';
+import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import AdminPanel from './pages/AdminPanel';
 

@@ -1,133 +1,91 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
-export default function Orders({ userRole = 'tezgah' }) {
-  const [orders, setOrders] = useState([
-    {
-      id: 'DGL-1049',
-      customerName: 'Ahmet Turgut',
-      date: '29 Temmuz 2026 - 14:30',
-      status: 'Hazırlanıyor',
-      needsColdChain: true,
-      coldChainDetails: {
-        icePacksNeeded: 2,
-        boxType: 'Orta Boy Strafor Kutu (M-3)',
-        packedWithIce: false,
-        packedInStrafor: false
-      },
-      items: [
-        { 
-          id: 101, 
-          name: 'Olgunlaştırılmış Ezine Peyniri', 
-          requestedWeight: 500, 
-          actualWeight: 500, 
-          unitPricePerKg: 360, 
-          totalPrice: 180, 
-          preference: 'İnce Dilim / Vakumlu Paket' 
-        },
-        { 
-          id: 102, 
-          name: 'Ev Yapımı Çam Balı', 
-          requestedWeight: 1000, 
-          actualWeight: 1000, 
-          unitPricePerKg: 350, 
-          totalPrice: 350, 
-          preference: 'Cam Kavanoz / Havalı Sarma' 
-        }
-      ],
-      sampleItem: null
-    },
-    {
-      id: 'DGL-1050',
-      customerName: 'Ayşe Yılmaz',
-      date: '29 Temmuz 2026 - 15:10',
-      status: 'Kargoya Verildi',
-      needsColdChain: false,
-      coldChainDetails: null,
-      items: [
-        { 
-          id: 103, 
-          name: 'Kayseri Ev Mantısı', 
-          requestedWeight: 1000, 
-          actualWeight: 1000, 
-          unitPricePerKg: 240, 
-          totalPrice: 240, 
-          preference: 'Karton Kutu' 
-        }
-      ],
-      sampleItem: '30g Tulum Peyniri (İkram)'
+export default function Orders({ userRole = 'tezgah', storeData }) {
+  const storeId = storeData?.id || 'guest';
+  const ORDERS_KEY = `dogalim_orders_${storeId}`;
+
+  const [orders, setOrders] = useState(() => {
+    try {
+      const raw = localStorage.getItem(ORDERS_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
     }
-  ]);
+  });
 
   const [selectedOrderForPrint, setSelectedOrderForPrint] = useState(null);
+
+  // Herhangi bir değişiklikte localStorage'a kaydet
+  useEffect(() => {
+    localStorage.setItem(ORDERS_KEY, JSON.stringify(orders));
+  }, [orders, ORDERS_KEY]);
 
   // Miktar / Gramaj Değişimi
   const handleWeightChange = (orderId, itemId, newWeight) => {
     const weightInGrams = parseFloat(newWeight) || 0;
-
-    setOrders(prevOrders => prevOrders.map(order => {
+    setOrders(prev => prev.map(order => {
       if (order.id !== orderId) return order;
-
       const updatedItems = order.items.map(item => {
         if (item.id !== itemId) return item;
         const calculatedPrice = (item.unitPricePerKg / 1000) * weightInGrams;
-        return {
-          ...item,
-          actualWeight: weightInGrams,
-          totalPrice: Math.round(calculatedPrice * 100) / 100
-        };
+        return { ...item, actualWeight: weightInGrams, totalPrice: Math.round(calculatedPrice * 100) / 100 };
       });
-
       return { ...order, items: updatedItems };
     }));
   };
 
   // İkram Ekleme
   const handleAddSample = (orderId) => {
-    const sampleName = prompt("Müşteriye pakette ikram etmek istediğiniz tadımlık ürün adını yazın:", "30g Çörek Otlu Tulum Peyniri");
+    const sampleName = prompt('Müşteriye pakette ikram etmek istediğiniz tadımlık ürün adını yazın:', '30g Çörek Otlu Tulum Peyniri');
     if (!sampleName) return;
-
-    setOrders(prevOrders => prevOrders.map(order => {
-      if (order.id === orderId) {
-        return { ...order, sampleItem: `${sampleName} (Ücretsiz İkram)` };
-      }
-      return order;
-    }));
+    setOrders(prev => prev.map(order =>
+      order.id === orderId ? { ...order, sampleItem: `${sampleName} (Ücretsiz İkram)` } : order
+    ));
   };
 
-  // Soğuk Zincir Paket Onay Kutusu (Checkbox)
+  // Soğuk Zincir Checkbox
   const toggleColdChainCheck = (orderId, field) => {
-    setOrders(prevOrders => prevOrders.map(order => {
+    setOrders(prev => prev.map(order => {
       if (order.id === orderId && order.coldChainDetails) {
-        return {
-          ...order,
-          coldChainDetails: {
-            ...order.coldChainDetails,
-            [field]: !order.coldChainDetails[field]
-          }
-        };
+        return { ...order, coldChainDetails: { ...order.coldChainDetails, [field]: !order.coldChainDetails[field] } };
       }
       return order;
     }));
   };
 
-  // Sipariş Durumu Değiştirme (Soğuk Zincir Onayı Kontrolü ile)
+  // Sipariş Durumu Değiştirme
   const handleStatusChange = (orderId, newStatus) => {
     const targetOrder = orders.find(o => o.id === orderId);
-
     if (newStatus === 'Kargoya Hazır' && targetOrder?.needsColdChain) {
       const { packedWithIce, packedInStrafor } = targetOrder.coldChainDetails;
       if (!packedWithIce || !packedInStrafor) {
-        alert("⚠️ DIKKAT: Soğuk zincir gerektiren bu siparişte Buz Aküsü ve Strafor Kutu onaylarını işaretlemeden durumu 'Kargoya Hazır' yapamazsınız!");
+        alert('⚠️ DIKKAT: Soğuk zincir gerektiren bu siparişte Buz Aküsü ve Strafor Kutu onaylarını işaretlemeden durumu değiştiremezsiniz!');
         return;
       }
     }
-
-    setOrders(prevOrders => prevOrders.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
+    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
   };
 
-  const calculateOrderTotal = (items) => {
-    return items.reduce((sum, item) => sum + item.totalPrice, 0).toFixed(2);
-  };
+  const calculateOrderTotal = (items) => items.reduce((sum, item) => sum + item.totalPrice, 0).toFixed(2);
+
+  // Boş durum
+  if (orders.length === 0) {
+    return (
+      <div style={styles.container}>
+        <div style={styles.header}>
+          <h2>📦 Şarküteri Sipariş & Soğuk Zincir Paneli</h2>
+          <span style={styles.subText}>Tartılan miktar girişi, hassas soğuk zincir kontrolü ve mutfak etiketleri.</span>
+        </div>
+        <div style={styles.emptyState}>
+          <span style={{ fontSize: '3rem' }}>📭</span>
+          <h3 style={{ margin: '12px 0 6px', color: '#0f172a' }}>Henüz Sipariş Yok</h3>
+          <p style={{ color: '#64748b', fontSize: '0.88rem', maxWidth: '320px', textAlign: 'center', lineHeight: '1.5' }}>
+            Müşterilerden yeni siparişler geldiğinde burada listelenecek. Platform üzerinden gelen siparişler otomatik görünecek.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={styles.container}>
@@ -139,8 +97,6 @@ export default function Orders({ userRole = 'tezgah' }) {
       <div style={styles.ordersList}>
         {orders.map(order => (
           <div key={order.id} style={styles.orderCard}>
-            
-            {/* SİPARİŞ BAŞLIĞI VE DURUMU */}
             <div style={styles.cardHeader}>
               <div>
                 <span style={styles.orderId}>{order.id}</span>
@@ -148,8 +104,8 @@ export default function Orders({ userRole = 'tezgah' }) {
                 <span style={{ marginLeft: '10px', color: '#94a3b8', fontSize: '0.8rem' }}>({order.date})</span>
               </div>
               <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <select 
-                  value={order.status} 
+                <select
+                  value={order.status}
                   onChange={(e) => handleStatusChange(order.id, e.target.value)}
                   style={{
                     ...styles.statusSelect,
@@ -164,7 +120,6 @@ export default function Orders({ userRole = 'tezgah' }) {
               </div>
             </div>
 
-            {/* SOĞUK ZİNCİR UYARI BARI (Eğer gerekliyse) */}
             {order.needsColdChain && (
               <div style={styles.coldChainAlertBox}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -176,31 +131,19 @@ export default function Orders({ userRole = 'tezgah' }) {
                     </p>
                   </div>
                 </div>
-
-                {/* TEZGAHTAR SAKLAMA KONTROLÜ */}
                 <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
                   <label style={styles.checkboxLabel}>
-                    <input 
-                      type="checkbox" 
-                      checked={order.coldChainDetails.packedInStrafor} 
-                      onChange={() => toggleColdChainCheck(order.id, 'packedInStrafor')}
-                    />
+                    <input type="checkbox" checked={order.coldChainDetails.packedInStrafor} onChange={() => toggleColdChainCheck(order.id, 'packedInStrafor')} />
                     Strafor Kutulandı
                   </label>
-
                   <label style={styles.checkboxLabel}>
-                    <input 
-                      type="checkbox" 
-                      checked={order.coldChainDetails.packedWithIce} 
-                      onChange={() => toggleColdChainCheck(order.id, 'packedWithIce')}
-                    />
+                    <input type="checkbox" checked={order.coldChainDetails.packedWithIce} onChange={() => toggleColdChainCheck(order.id, 'packedWithIce')} />
                     {order.coldChainDetails.icePacksNeeded}x Buz Aküsü Eklendi
                   </label>
                 </div>
               </div>
             )}
 
-            {/* ÜRÜN TABLOSU */}
             <div style={styles.tableWrapper}>
               <table style={styles.table}>
                 <thead>
@@ -216,15 +159,13 @@ export default function Orders({ userRole = 'tezgah' }) {
                   {order.items.map(item => (
                     <tr key={item.id} style={styles.tr}>
                       <td style={styles.td}><b>{item.name}</b></td>
-                      <td style={styles.td}>
-                        <span style={styles.prefBadge}>🏷️ {item.preference}</span>
-                      </td>
+                      <td style={styles.td}><span style={styles.prefBadge}>🏷️ {item.preference}</span></td>
                       <td style={styles.td}>{item.requestedWeight} gr</td>
                       <td style={styles.td}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                          <input 
-                            type="number" 
-                            value={item.actualWeight} 
+                          <input
+                            type="number"
+                            value={item.actualWeight}
                             onChange={(e) => handleWeightChange(order.id, item.id, e.target.value)}
                             style={styles.weightInput}
                           />
@@ -232,9 +173,7 @@ export default function Orders({ userRole = 'tezgah' }) {
                         </div>
                       </td>
                       {userRole === 'patron' && (
-                        <td style={{ ...styles.td, fontWeight: 'bold', color: '#0f172a' }}>
-                          ₺{item.totalPrice.toFixed(2)}
-                        </td>
+                        <td style={{ ...styles.td, fontWeight: 'bold', color: '#0f172a' }}>₺{item.totalPrice.toFixed(2)}</td>
                       )}
                     </tr>
                   ))}
@@ -242,7 +181,6 @@ export default function Orders({ userRole = 'tezgah' }) {
               </table>
             </div>
 
-            {/* ALT AKSİYON BARI */}
             <div style={styles.cardFooter}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 {order.sampleItem ? (
@@ -253,27 +191,20 @@ export default function Orders({ userRole = 'tezgah' }) {
                   </button>
                 )}
               </div>
-
               <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
                 {userRole === 'patron' ? (
                   <div style={{ textAlign: 'right' }}>
                     <span style={{ fontSize: '0.85rem', color: '#64748b' }}>Güncel Toplam Tutar:</span>
-                    <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#10b981' }}>
-                      ₺{calculateOrderTotal(order.items)}
-                    </div>
+                    <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#10b981' }}>₺{calculateOrderTotal(order.items)}</div>
                   </div>
                 ) : (
-                  <span style={{ fontSize: '0.85rem', color: '#94a3b8', fontStyle: 'italic' }}>
-                    🔒 Fiyat bilgisi Tezgah Modunda kilitlidir.
-                  </span>
+                  <span style={{ fontSize: '0.85rem', color: '#94a3b8', fontStyle: 'italic' }}>🔒 Fiyat bilgisi Tezgah Modunda kilitlidir.</span>
                 )}
-
                 <button onClick={() => setSelectedOrderForPrint(order)} style={styles.printBtn}>
                   🖨️ Mutfak Etiketi Yazdır
                 </button>
               </div>
             </div>
-
           </div>
         ))}
       </div>
@@ -286,13 +217,10 @@ export default function Orders({ userRole = 'tezgah' }) {
               <h3 style={{ margin: 0 }}>🍃 DOĞALİM ŞARKÜTERİ</h3>
               <p style={{ margin: '4px 0 0 0', fontSize: '0.8rem' }}>Mutfak Hazırlık Etiketi</p>
             </div>
-
             <div style={{ fontSize: '0.85rem', marginBottom: '10px' }}>
               <p style={{ margin: '2px 0' }}><b>Sipariş No:</b> #{selectedOrderForPrint.id}</p>
               <p style={{ margin: '2px 0' }}><b>Müşteri:</b> {selectedOrderForPrint.customerName}</p>
               <p style={{ margin: '2px 0' }}><b>Tarih:</b> {selectedOrderForPrint.date}</p>
-
-              {/* DİNAMİK SOĞUK ZİNCİR ÇIKTISI */}
               {selectedOrderForPrint.needsColdChain && (selectedOrderForPrint.coldChainDetails?.packedInStrafor || selectedOrderForPrint.coldChainDetails?.packedWithIce) && (
                 <div style={{ backgroundColor: '#000', color: '#fff', padding: '6px', textAlign: 'center', marginTop: '6px', fontWeight: 'bold', fontSize: '0.75rem', lineHeight: '1.4' }}>
                   ❄️ SOĞUK ZİNCİR PAKETLEME:
@@ -301,7 +229,6 @@ export default function Orders({ userRole = 'tezgah' }) {
                 </div>
               )}
             </div>
-
             <div style={{ borderTop: '1px solid #000', borderBottom: '1px solid #000', padding: '8px 0', marginBottom: '10px' }}>
               {selectedOrderForPrint.items.map((it, idx) => (
                 <div key={idx} style={{ marginBottom: '8px', fontSize: '0.85rem' }}>
@@ -311,12 +238,9 @@ export default function Orders({ userRole = 'tezgah' }) {
                 </div>
               ))}
               {selectedOrderForPrint.sampleItem && (
-                <div style={{ fontSize: '0.8rem', fontWeight: 'bold', marginTop: '4px' }}>
-                  🎁 {selectedOrderForPrint.sampleItem}
-                </div>
+                <div style={{ fontSize: '0.8rem', fontWeight: 'bold', marginTop: '4px' }}>🎁 {selectedOrderForPrint.sampleItem}</div>
               )}
             </div>
-
             <div style={{ display: 'flex', gap: '8px' }}>
               <button onClick={() => window.print()} style={{ ...styles.printBtn, flex: 1 }}>Yazdır</button>
               <button onClick={() => setSelectedOrderForPrint(null)} style={{ ...styles.cancelBtn, flex: 1 }}>Kapat</button>
@@ -324,7 +248,6 @@ export default function Orders({ userRole = 'tezgah' }) {
           </div>
         </div>
       )}
-
     </div>
   );
 }
@@ -333,6 +256,7 @@ const styles = {
   container: { display: 'flex', flexDirection: 'column', gap: '20px' },
   header: { marginBottom: '10px' },
   subText: { color: '#64748b', fontSize: '0.9rem' },
+  emptyState: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff', borderRadius: '16px', border: '2px dashed #e2e8f0', padding: '60px 24px', gap: '8px' },
   ordersList: { display: 'flex', flexDirection: 'column', gap: '20px' },
   orderCard: { backgroundColor: '#fff', borderRadius: '12px', border: '1px solid #e2e8f0', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' },
   cardHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', paddingBottom: '12px', borderBottom: '1px solid #f1f5f9' },
