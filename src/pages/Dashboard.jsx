@@ -6,19 +6,26 @@ import Products from './products';
 import Disputes from './disputes';
 import Financials from './financials';
 import AiAssistant from './aiAssistant';
-import Logistics from './logistics'; // YENİ EKLENEN LOJİSTİK MODÜLÜ
+import Logistics from './logistics';
 
-export default function Dashboard() {
+export default function Dashboard({ onLogout, storeData }) {
   const [activeTab, setActiveTab] = useState('orders');
   const [userRole, setUserRole] = useState('tezgah');
   const [showPinModal, setShowPinModal] = useState(false);
   const [pinInput, setPinInput] = useState('');
   const [pinError, setPinError] = useState(false);
 
-  const user = auth.currentUser;
+  // Giriş yapan dükkan bilgileri (Yoksa varsayılan)
+  const storeName = storeData?.storeName || 'DOĞALİM ŞARKÜTERİ';
+  const ownerName = storeData?.fullName || storeData?.applicantName || 'Dükkan Yöneticisi';
+  const avatarLetter = storeName.charAt(0).toUpperCase();
 
-  const handleLogout = () => {
-    signOut(auth);
+  const handleLogout = async () => {
+    if (onLogout) {
+      await onLogout();
+    } else {
+      await signOut(auth);
+    }
   };
 
   const handleRoleToggleClick = () => {
@@ -50,7 +57,10 @@ export default function Dashboard() {
         <div>
           <div style={styles.brand}>
             <span style={styles.logoIcon}>🍃</span>
-            <h2 style={styles.logoText}>DOĞALİM</h2>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <h2 style={styles.logoText}>{storeName}</h2>
+              <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>Doğalım İşletme Portalı</span>
+            </div>
             <span style={{ 
               ...styles.badge, 
               backgroundColor: userRole === 'patron' ? '#10b981' : '#d97706' 
@@ -123,12 +133,12 @@ export default function Dashboard() {
               ...styles.avatar,
               backgroundColor: userRole === 'patron' ? '#10b981' : '#d97706'
             }}>
-              {user?.displayName ? user.displayName[0].toUpperCase() : 'Ö'}
+              {avatarLetter}
             </div>
             <div style={styles.userDetails}>
-              <span style={styles.userName}>{user?.displayName || 'Özgür Kasap'}</span>
+              <span style={styles.userName}>{ownerName}</span>
               <span style={styles.userRole}>
-                {userRole === 'patron' ? 'Dükkan Sahibi' : 'Tezgahtar Modu'}
+                {userRole === 'patron' ? 'İşletme Sahibi' : 'Tezgahtar Modu'}
               </span>
             </div>
           </div>
@@ -144,7 +154,7 @@ export default function Dashboard() {
         <header style={styles.header}>
           <div>
             <h1 style={styles.headerTitle}>
-              {activeTab === 'orders' && "Şarküteri Operasyon & Tartı Yönetimi"}
+              {activeTab === 'orders' && `${storeName} - Sipariş & Tartı Yönetimi`}
               {activeTab === 'logistics' && "Yerel Kurye & Soğuk Zincir Sevkiyat"}
               {activeTab === 'products' && "Yöresel Ürün & Stok Kataloğu"}
               {activeTab === 'disputes' && "Destek & Kısmi İade Yönetimi"}
@@ -173,12 +183,12 @@ export default function Dashboard() {
         </header>
 
         {/* MODÜL RENDER ALANLARI */}
-        {activeTab === 'orders' && <Orders userRole={userRole} />}
-        {activeTab === 'logistics' && <Logistics userRole={userRole} />}
-        {activeTab === 'products' && <Products userRole={userRole} />}
-        {activeTab === 'disputes' && <Disputes userRole={userRole} />}
-        {activeTab === 'financials' && <Financials userRole={userRole} />}
-        {activeTab === 'ai-assistant' && <AiAssistant userRole={userRole} />}
+        {activeTab === 'orders' && <Orders userRole={userRole} storeData={storeData} />}
+        {activeTab === 'logistics' && <Logistics userRole={userRole} storeData={storeData} />}
+        {activeTab === 'products' && <Products userRole={userRole} storeData={storeData} />}
+        {activeTab === 'disputes' && <Disputes userRole={userRole} storeData={storeData} />}
+        {activeTab === 'financials' && <Financials userRole={userRole} storeData={storeData} />}
+        {activeTab === 'ai-assistant' && <AiAssistant userRole={userRole} storeData={storeData} />}
       </main>
 
       {/* PATRON MODU ŞİFRE MODALI */}
@@ -224,22 +234,22 @@ const styles = {
   sidebar: { width: '270px', backgroundColor: '#0f172a', color: '#fff', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '24px 16px' },
   brand: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '32px', paddingLeft: '8px' },
   logoIcon: { fontSize: '1.8rem' },
-  logoText: { margin: 0, fontSize: '1.2rem', fontWeight: 'bold', letterSpacing: '1px', color: '#f8fafc' },
-  badge: { color: '#fff', fontSize: '0.65rem', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold' },
+  logoText: { margin: 0, fontSize: '1.05rem', fontWeight: 'bold', color: '#f8fafc', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '140px' },
+  badge: { color: '#fff', fontSize: '0.65rem', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold', marginLeft: 'auto' },
   nav: { display: 'flex', flexDirection: 'column', gap: '8px' },
   navBtn: { display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', backgroundColor: 'transparent', color: '#94a3b8', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '0.95rem', fontWeight: '500', textAlign: 'left' },
   activeNavBtn: { backgroundColor: '#1e293b', color: '#38bdf8', fontWeight: 'bold' },
   sidebarFooter: { borderTop: '1px solid #334155', paddingTop: '16px', display: 'flex', flexDirection: 'column', gap: '12px' },
   roleToggleBtn: { padding: '10px', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.85rem', transition: '0.2s' },
   userInfo: { display: 'flex', alignItems: 'center', gap: '12px' },
-  avatar: { width: '36px', height: '36px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', color: '#fff' },
+  avatar: { width: '36px', height: '36px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', color: '#fff', fontSize: '1rem' },
   userDetails: { display: 'flex', flexDirection: 'column' },
-  userName: { fontSize: '0.9rem', fontWeight: 'bold', color: '#f8fafc' },
+  userName: { fontSize: '0.88rem', fontWeight: 'bold', color: '#f8fafc', maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   userRole: { fontSize: '0.72rem', color: '#94a3b8' },
   logoutBtn: { padding: '8px', backgroundColor: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.85rem' },
   mainContent: { flex: 1, padding: '32px', overflowY: 'auto' },
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '28px' },
-  headerTitle: { margin: 0, fontSize: '1.6rem', color: '#0f172a' },
+  headerTitle: { margin: 0, fontSize: '1.5rem', color: '#0f172a' },
   headerSub: { margin: '4px 0 0 0', color: '#64748b', fontSize: '0.9rem' },
   roleIndicator: { padding: '6px 14px', borderRadius: '20px', fontSize: '0.85rem', fontWeight: 'bold' },
   modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15, 23, 42, 0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 },

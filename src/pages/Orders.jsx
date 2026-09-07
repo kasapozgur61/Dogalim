@@ -292,9 +292,12 @@ export default function Orders({ userRole = 'tezgah' }) {
               <p style={{ margin: '2px 0' }}><b>Müşteri:</b> {selectedOrderForPrint.customerName}</p>
               <p style={{ margin: '2px 0' }}><b>Tarih:</b> {selectedOrderForPrint.date}</p>
 
-              {selectedOrderForPrint.needsColdChain && (
-                <div style={{ backgroundColor: '#000', color: '#fff', padding: '6px', textAlign: 'center', marginTop: '6px', fontWeight: 'bold', fontSize: '0.75rem' }}>
-                  ❄️ SOĞUK ZİNCİR: {selectedOrderForPrint.coldChainDetails?.icePacksNeeded} BUZ AKÜSÜ + STRAFOR KUTU
+              {/* DİNAMİK SOĞUK ZİNCİR ÇIKTISI */}
+              {selectedOrderForPrint.needsColdChain && (selectedOrderForPrint.coldChainDetails?.packedInStrafor || selectedOrderForPrint.coldChainDetails?.packedWithIce) && (
+                <div style={{ backgroundColor: '#000', color: '#fff', padding: '6px', textAlign: 'center', marginTop: '6px', fontWeight: 'bold', fontSize: '0.75rem', lineHeight: '1.4' }}>
+                  ❄️ SOĞUK ZİNCİR PAKETLEME:
+                  {selectedOrderForPrint.coldChainDetails?.packedInStrafor && <div>✓ STRAFOR KUTU KULLANILDI</div>}
+                  {selectedOrderForPrint.coldChainDetails?.packedWithIce && <div>✓ {selectedOrderForPrint.coldChainDetails.icePacksNeeded}x BUZ AKÜSÜ EKLENDİ</div>}
                 </div>
               )}
             </div>

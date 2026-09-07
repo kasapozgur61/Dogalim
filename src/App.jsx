@@ -1,35 +1,50 @@
 import React, { useState } from 'react';
+import { auth } from './firebase';
+import { signOut } from 'firebase/auth';
 import Login from './pages/login';
 import Dashboard from './pages/Dashboard';
 import AdminPanel from './pages/AdminPanel';
 
 export default function App() {
-  const [userRole, setUserRole] = useState(null); // 'admin', 'seller' veya null
+  const [userRole, setUserRole] = useState(localStorage.getItem('userRole') || null);
+  const [currentStore, setCurrentStore] = useState(() => {
+    const saved = localStorage.getItem('currentStore');
+    return saved ? JSON.parse(saved) : null;
+  });
 
-  // Başarılı Giriş Yapıldığında
-  const handleLoginSuccess = (role) => {
+  const handleLoginSuccess = (role, userData = null) => {
     setUserRole(role);
+    localStorage.setItem('userRole', role);
+    if (userData) {
+      setCurrentStore(userData);
+      localStorage.setItem('currentStore', JSON.stringify(userData));
+    }
   };
 
-  // Çıkış Yapıldığında
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+    } catch (e) {
+      console.log('SignOut atlandı');
+    }
     setUserRole(null);
+    setCurrentStore(null);
+    localStorage.removeItem('userRole');
+    localStorage.removeItem('currentStore');
   };
 
-  // 1. KULLANICI GİRİŞ YAPMAMIŞSA -> TERÇİH BUTONLU GİRİŞ EKRANI
   if (!userRole) {
     return <Login onLoginSuccess={handleLoginSuccess} />;
   }
 
-  // 2. KULLANICI ADMIN İSE -> ADMIN VE SAHA ONAY PANELİ
   if (userRole === 'admin') {
-    return <AdminPanel onLogout={handleLogout} />;
+    return (
+      <AdminPanel 
+        onLogout={handleLogout} 
+        currentAdminEmail={currentStore?.email || 'kasapozgur61@gmail.com'} 
+      />
+    );
   }
 
-  // 3. KULLANICI ŞARKÜTERİ SATICISI İSE -> STANDART ŞARKÜTERİ DASHBOARD
-  if (userRole === 'seller') {
-    return <Dashboard onLogout={handleLogout} />;
-  }
-
-  return null;
+  return <Dashboard onLogout={handleLogout} storeData={currentStore} />;
 }
