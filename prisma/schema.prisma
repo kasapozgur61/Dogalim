@@ -11,7 +11,7 @@ datasource db {
 }
 
 // ─────────────────────────────────────────────────────────────
-// 1. KULLANICI & MÜŞTERİ (Mevcut Mobil Şema)
+// 1. KULLANICI & MÜŞTERİ
 // ─────────────────────────────────────────────────────────────
 model User {
   id         String       @id @default(uuid())
@@ -33,7 +33,7 @@ model User {
 }
 
 // ─────────────────────────────────────────────────────────────
-// 2. ŞARKÜTERİ / ESNAF (Mobil Şema + Web Paneli Entegrasyonu)
+// 2. ŞARKÜTERİ / ESNAF
 // ─────────────────────────────────────────────────────────────
 model Seller {
   id              String       @id @default(uuid())
@@ -48,13 +48,13 @@ model Seller {
   is_open         Boolean      @default(true)
   created_at      DateTime     @default(now())
 
-  // 🆕 Web & Saha Onay Entegrasyon Alanları
+  // Web & Saha Onay Entegrasyon Alanları
   applicant_name   String?                   // Yetkili Ad Soyad
-  tax_number       String?                   // Vergi No / TCKN
-  address          String?                   // Dükkan Açık Adresi
-  patron_pin       String?      @default("1234") // Patron Modu Geçiş PIN Kodu
-  appointment_date DateTime?                 // Saha İnceleme Randevu Tarihi
-  appointment_time String?                   // Saha Randevu Saati ("10:00 - 12:00")
+  tax_number       String?                   // Vergi Numarası / TCKN
+  address          String?                   // Dükkan fiziki açık adresi
+  patron_pin       String?      @default("1234") // Tezgah modundan Patron moduna geçiş PIN'i
+  appointment_date DateTime?                 // Saha denetim randevu tarihi
+  appointment_time String?                   // Randevu saati ("10:00 - 12:00")
 
   products        Prod[]
   followers       Follows[]
@@ -64,7 +64,7 @@ model Seller {
 }
 
 // ─────────────────────────────────────────────────────────────
-// 3. ŞARKÜTERİ PERSONELİ (Tezgahtar / Çalışan Yönetimi)
+// 3. ŞARKÜTERİ PERSONELİ (Personel & Tezgahtar Yönetimi)
 // ─────────────────────────────────────────────────────────────
 model SellerStaff {
   id         String   @id @default(uuid())
@@ -73,7 +73,7 @@ model SellerStaff {
   name       String
   email      String   @unique
   pass_hash  String
-  role       String   @default("TEZGAH") // "TEZGAH" (Yalnızca sipariş/tartı) veya "PATRON" (Tam yetki)
+  role       String   @default("TEZGAH") // "TEZGAH" veya "PATRON"
   created_at DateTime @default(now())
 }
 
@@ -85,12 +85,12 @@ model Admin {
   email      String   @unique
   pass_hash  String
   name       String?
-  role       String   @default("FIELD_AGENT") // "SUPER_ADMIN", "FIELD_AGENT" (Saha Denetim Yetkilisi)
+  role       String   @default("FIELD_AGENT") // "SUPER_ADMIN" veya "FIELD_AGENT"
   created_at DateTime @default(now())
 }
 
 // ─────────────────────────────────────────────────────────────
-// 5. ADRES (Mevcut Mobil Şema - PostGIS Destekli)
+// 5. ADRES
 // ─────────────────────────────────────────────────────────────
 model Address {
   id        String   @id @default(uuid())
@@ -106,7 +106,7 @@ model Address {
 }
 
 // ─────────────────────────────────────────────────────────────
-// 6. KURYELER (Mevcut Mobil Şema - PostGIS Destekli)
+// 6. KURYELER
 // ─────────────────────────────────────────────────────────────
 model Couriers {
   id               String       @id @default(uuid())
@@ -128,7 +128,7 @@ model Couriers {
 }
 
 // ─────────────────────────────────────────────────────────────
-// 7. YÖRESEL ÜRÜN (Mobil Şema + Şarküteri Soğuk Zincir Alanları)
+// 7. YÖRESEL ÜRÜN
 // ─────────────────────────────────────────────────────────────
 model Prod {
   id                  String       @id @default(uuid())
@@ -136,7 +136,7 @@ model Prod {
   seller              Seller       @relation(fields: [sellerid], references: [id], onDelete: Cascade)
   name                String
   price               Float
-  stock               Float        @default(0.0) // Kg veya adet bazında stok
+  stock               Float        @default(0.0)
   description         String?
   rating              Float        @default(0.0)
   reviewcount         Int          @default(0)
@@ -145,12 +145,10 @@ model Prod {
   prepare_time        Int          @default(15)
   created_at          DateTime     @default(now())
 
-  // 🆕 Şarküteri ve Doğallık Nitelikleri
-  origin              String?      // Yöre / Menşe (Örn: "Trabzon Tonya", "Kars Boğatepe")
-  aging_period        String?      // Olgunlaşma Süresi (Örn: "18 Ay Eski Kaşar", "Taze Üretim")
-  requires_cold_chain Boolean      @default(false) // Soğuk Zincir Zorunluluğu (Buz Aküsü & Strafor)
-  unit                String       @default("KG")  // "KG", "GRAM", "ADET", "PAKET"
-  options             String[]     @default([])    // ["Vakumlu Paket", "İnce Dilim", "Kalıp"]
+  // Şarküteri Soğuk Zincir ve Paketleme
+  requires_cold_chain Boolean      @default(false)
+  unit                String       @default("KG")
+  options             String[]     @default([])
 
   orderItems      OrderItem[]
   likedBy         LikedProds[]
@@ -159,7 +157,7 @@ model Prod {
 }
 
 // ─────────────────────────────────────────────────────────────
-// 8. SİPARİŞLER (Mobil Şema + Tartı & Soğuk Zincir Paketleme)
+// 8. SİPARİŞLER
 // ─────────────────────────────────────────────────────────────
 model Orders {
   id                    String      @id @default(uuid())
@@ -175,17 +173,12 @@ model Orders {
   estimated_prep_time   Int?
   created_at            DateTime    @default(now())
 
-  // 🆕 Şarküteri Esnafı Soğuk Zincir ve İkram Alanları
-  sample_item           String?     // Esnaf ikramı (Örn: "30g Çörek Otlu Tulum Peyniri")
-  packed_with_ice       Boolean     @default(false) // Buz aküsü konuldu mu?
-  packed_in_strafor     Boolean     @default(false) // Strafor kutuya yerleştirildi mi?
-
   items                 OrderItem[]
   disputes              Dispute[]
 }
 
 // ─────────────────────────────────────────────────────────────
-// 9. SİPARİŞ KALEMİ (Mobil Şema + Esnaf Tartı Gramajı)
+// 9. SİPARİŞ KALEMİ (Hassas Terazi / Tartı)
 // ─────────────────────────────────────────────────────────────
 model OrderItem {
   id            String   @id @default(uuid())
@@ -194,15 +187,12 @@ model OrderItem {
   prodid        String
   product       Prod     @relation(fields: [prodid], references: [id])
   quantity      Int
-  price         Float    // Birim fiyat veya hesaplanan satır fiyatı
-
-  // 🆕 Şarküteri Tartı Alanı
+  price         Float
   actual_weight Float?   // Esnafın terazide tarttığı net gramaj (Örn: 520.0 gr)
-  notes         String?  // Müşterinin dilimleme veya özel notu
 }
 
 // ─────────────────────────────────────────────────────────────
-// 10. TESLİM EDİLEN ESKİ SİPARİŞLER (Mevcut Mobil Şema)
+// 10. TESLİM EDİLEN ESKİ SİPARİŞLER
 // ─────────────────────────────────────────────────────────────
 model LastOrders {
   id                    String    @id @default(uuid())
@@ -220,7 +210,7 @@ model LastOrders {
 }
 
 // ─────────────────────────────────────────────────────────────
-// 11. MÜŞTERİ DESTEK & KISMİ İADE TALEPLERİ (Hasar / Soğuk Zincir)
+// 11. MÜŞTERİ DESTEK & KISMİ İADE TALEPLERİ
 // ─────────────────────────────────────────────────────────────
 model Dispute {
   id          String   @id @default(uuid())
@@ -228,14 +218,14 @@ model Dispute {
   order       Orders   @relation(fields: [orderid], references: [id], onDelete: Cascade)
   userid      String
   user        User     @relation(fields: [userid], references: [id], onDelete: Cascade)
-  reason      String   // Örn: "Vakumu açılmış", "Sıcak teslim edildi", "Paket hasarlı"
+  reason      String
   status      String   @default("PENDING") // PENDING, APPROVED, REJECTED
   refund_type String?  // PARTIAL_REFUND, FULL_REFUND, RESEND
   created_at  DateTime @default(now())
 }
 
 // ─────────────────────────────────────────────────────────────
-// 12. TAKİP & BEĞENİ & ETİKET & YORUMLAR (Mevcut Mobil Şema)
+// 12. TAKİP & BEĞENİ & ETİKET & YORUMLAR
 // ─────────────────────────────────────────────────────────────
 model Follows {
   userid     String
