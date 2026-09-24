@@ -1,17 +1,21 @@
 import React, { useState } from 'react';
-import { auth, updateUserProfileData } from './firebase';
+import { sellerService } from './services/api';
 
-export default function ProfileSettings({ onClose }) {
-  const user = auth.currentUser;
-  const [displayName, setDisplayName] = useState(user?.displayName || '');
-  const [username, setUsername] = useState('');
+export default function ProfileSettings({ onClose, currentStore }) {
+  const [displayName, setDisplayName] = useState(currentStore?.fullName || currentStore?.storeName || '');
+  const [username, setUsername] = useState(currentStore?.email?.split('@')[0] || '');
   const [loading, setLoading] = useState(false);
 
   const handleUpdate = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
-      await updateUserProfileData(user, displayName, username);
+      await sellerService.updateProfile(currentStore?.id, { displayName, username });
+      // Yerel oturum güncellemesi
+      if (currentStore) {
+        const updated = { ...currentStore, fullName: displayName, storeName: displayName };
+        localStorage.setItem('currentStore', JSON.stringify(updated));
+      }
       alert("Profil bilgileriniz başarıyla güncellendi!");
       if (onClose) onClose();
     } catch (error) {
@@ -26,7 +30,7 @@ export default function ProfileSettings({ onClose }) {
       <h3 style={{ marginTop: 0 }}>Profil Bilgilerini Düzenle</h3>
       <form onSubmit={handleUpdate} style={styles.form}>
         <div style={styles.inputGroup}>
-          <label style={styles.label}>Ad Soyad:</label>
+          <label style={styles.label}>Ad Soyad / Dükkan Adı:</label>
           <input 
             type="text" 
             value={displayName} 

@@ -1,6 +1,4 @@
 import React, { useState } from 'react';
-import { auth } from './firebase';
-import { signOut } from 'firebase/auth';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import AdminPanel from './pages/AdminPanel';
@@ -21,16 +19,12 @@ export default function App() {
     }
   };
 
-  const handleLogout = async () => {
-    try {
-      await signOut(auth);
-    } catch (e) {
-      console.log('SignOut atlandı');
-    }
+  const handleLogout = () => {
     setUserRole(null);
     setCurrentStore(null);
     localStorage.removeItem('userRole');
     localStorage.removeItem('currentStore');
+    localStorage.removeItem('token');
   };
 
   if (!userRole) {

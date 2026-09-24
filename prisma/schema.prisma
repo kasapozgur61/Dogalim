@@ -1,0 +1,312 @@
+// Prisma Schema - Doğalım Platformu
+// Mobil Uygulama ve Web Satıcı/Saha Paneli Ortak Veritabanı Şeması
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────────
+// 1. KULLANICI & MÜŞTERİ (Mevcut Mobil Şema)
+// ─────────────────────────────────────────────────────────────
+model User {
+  id         String       @id @default(uuid())
+  username   String
+  email      String       @unique
+  pass_hash  String
+  phone      String?      @unique
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+  
+  addresses  Address[]
+  orders     Orders[]
+  lastOrders LastOrders[]
+  follows    Follows[]
+  likedProds LikedProds[]
+  prodComs   ProdCom[]
+  sellerComs SellerCom[]
+  disputes   Dispute[]
+}
+
+// ─────────────────────────────────────────────────────────────
+// 2. ŞARKÜTERİ / ESNAF (Mobil Şema + Web Paneli Entegrasyonu)
+// ─────────────────────────────────────────────────────────────
+model Seller {
+  id              String       @id @default(uuid())
+  storename       String
+  email           String       @unique
+  pass_hash       String
+  phone           String?      @unique
+  rating          Float        @default(0.0)
+  reviewcount     Int          @default(0)
+  minbasketamount Float        @default(0.0)
+  isapproved      Boolean      @default(false)
+  is_open         Boolean      @default(true)
+  created_at      DateTime     @default(now())
+
+  // 🆕 Web & Saha Onay Entegrasyon Alanları
+  applicant_name   String?                   // Yetkili Ad Soyad
+  tax_number       String?                   // Vergi No / TCKN
+  address          String?                   // Dükkan Açık Adresi
+  patron_pin       String?      @default("1234") // Patron Modu Geçiş PIN Kodu
+  appointment_date DateTime?                 // Saha İnceleme Randevu Tarihi
+  appointment_time String?                   // Saha Randevu Saati ("10:00 - 12:00")
+
+  products        Prod[]
+  followers       Follows[]
+  sellerHashtags  SellerHtIt[]
+  sellerComs      SellerCom[]
+  staff           SellerStaff[]
+}
+
+// ─────────────────────────────────────────────────────────────
+// 3. ŞARKÜTERİ PERSONELİ (Tezgahtar / Çalışan Yönetimi)
+// ─────────────────────────────────────────────────────────────
+model SellerStaff {
+  id         String   @id @default(uuid())
+  sellerid   String
+  seller     Seller   @relation(fields: [sellerid], references: [id], onDelete: Cascade)
+  name       String
+  email      String   @unique
+  pass_hash  String
+  role       String   @default("TEZGAH") // "TEZGAH" (Yalnızca sipariş/tartı) veya "PATRON" (Tam yetki)
+  created_at DateTime @default(now())
+}
+
+// ─────────────────────────────────────────────────────────────
+// 4. PLATFORM & SAHA YÖNETİCİLERİ (Admin Sistemi)
+// ─────────────────────────────────────────────────────────────
+model Admin {
+  id         String   @id @default(uuid())
+  email      String   @unique
+  pass_hash  String
+  name       String?
+  role       String   @default("FIELD_AGENT") // "SUPER_ADMIN", "FIELD_AGENT" (Saha Denetim Yetkilisi)
+  created_at DateTime @default(now())
+}
+
+// ─────────────────────────────────────────────────────────────
+// 5. ADRES (Mevcut Mobil Şema - PostGIS Destekli)
+// ─────────────────────────────────────────────────────────────
+model Address {
+  id        String   @id @default(uuid())
+  userid    String
+  title     String
+  address   String
+  user      User     @relation(fields: [userid], references: [id], onDelete: Cascade)
+
+  location  Unsupported("geography(Point, 4326)")?
+
+  orders       Orders[]
+  lastOrders   LastOrders[]
+}
+
+// ─────────────────────────────────────────────────────────────
+// 6. KURYELER (Mevcut Mobil Şema - PostGIS Destekli)
+// ─────────────────────────────────────────────────────────────
+model Couriers {
+  id               String       @id @default(uuid())
+  name             String
+  phone            String       @unique
+  email            String       @unique
+  pass_hash        String
+  vehicle_type     String
+  is_active        Boolean      @default(true)
+
+  location         Unsupported("geography(Point, 4326)")?
+
+  today_distance   Float        @default(0.0)
+  active_seconds   Int          @default(0)
+  last_ping_at     DateTime?
+
+  orders            Orders[]
+  lastOrders        LastOrders[]
+}
+
+// ─────────────────────────────────────────────────────────────
+// 7. YÖRESEL ÜRÜN (Mobil Şema + Şarküteri Soğuk Zincir Alanları)
+// ─────────────────────────────────────────────────────────────
+model Prod {
+  id                  String       @id @default(uuid())
+  sellerid            String
+  seller              Seller       @relation(fields: [sellerid], references: [id], onDelete: Cascade)
+  name                String
+  price               Float
+  stock               Float        @default(0.0) // Kg veya adet bazında stok
+  description         String?
+  rating              Float        @default(0.0)
+  reviewcount         Int          @default(0)
+  imageUrl            String?
+  isAvailable         Boolean      @default(true)
+  prepare_time        Int          @default(15)
+  created_at          DateTime     @default(now())
+
+  // 🆕 Şarküteri ve Doğallık Nitelikleri
+  origin              String?      // Yöre / Menşe (Örn: "Trabzon Tonya", "Kars Boğatepe")
+  aging_period        String?      // Olgunlaşma Süresi (Örn: "18 Ay Eski Kaşar", "Taze Üretim")
+  requires_cold_chain Boolean      @default(false) // Soğuk Zincir Zorunluluğu (Buz Aküsü & Strafor)
+  unit                String       @default("KG")  // "KG", "GRAM", "ADET", "PAKET"
+  options             String[]     @default([])    // ["Vakumlu Paket", "İnce Dilim", "Kalıp"]
+
+  orderItems      OrderItem[]
+  likedBy         LikedProds[]
+  productHashtags ProdHtIt[]
+  comments        ProdCom[]
+}
+
+// ─────────────────────────────────────────────────────────────
+// 8. SİPARİŞLER (Mobil Şema + Tartı & Soğuk Zincir Paketleme)
+// ─────────────────────────────────────────────────────────────
+model Orders {
+  id                    String      @id @default(uuid())
+  userid                String
+  user                  User        @relation(fields: [userid], references: [id])
+  total_amount          Float
+  courierid             String?
+  courier               Couriers?   @relation(fields: [courierid], references: [id])
+  status                String      @default("PENDING") // PENDING, PREPARING, PREPARED, WAITING, ON_THE_WAY, COMPLETED, CANCELLED
+  payment_method        String
+  addressid             String
+  address               Address     @relation(fields: [addressid], references: [id])
+  estimated_prep_time   Int?
+  created_at            DateTime    @default(now())
+
+  // 🆕 Şarküteri Esnafı Soğuk Zincir ve İkram Alanları
+  sample_item           String?     // Esnaf ikramı (Örn: "30g Çörek Otlu Tulum Peyniri")
+  packed_with_ice       Boolean     @default(false) // Buz aküsü konuldu mu?
+  packed_in_strafor     Boolean     @default(false) // Strafor kutuya yerleştirildi mi?
+
+  items                 OrderItem[]
+  disputes              Dispute[]
+}
+
+// ─────────────────────────────────────────────────────────────
+// 9. SİPARİŞ KALEMİ (Mobil Şema + Esnaf Tartı Gramajı)
+// ─────────────────────────────────────────────────────────────
+model OrderItem {
+  id            String   @id @default(uuid())
+  orderid       String
+  order         Orders   @relation(fields: [orderid], references: [id], onDelete: Cascade)
+  prodid        String
+  product       Prod     @relation(fields: [prodid], references: [id])
+  quantity      Int
+  price         Float    // Birim fiyat veya hesaplanan satır fiyatı
+
+  // 🆕 Şarküteri Tartı Alanı
+  actual_weight Float?   // Esnafın terazide tarttığı net gramaj (Örn: 520.0 gr)
+  notes         String?  // Müşterinin dilimleme veya özel notu
+}
+
+// ─────────────────────────────────────────────────────────────
+// 10. TESLİM EDİLEN ESKİ SİPARİŞLER (Mevcut Mobil Şema)
+// ─────────────────────────────────────────────────────────────
+model LastOrders {
+  id                    String    @id @default(uuid())
+  userid                String
+  user                  User      @relation(fields: [userid], references: [id])
+  total_amount          Float
+  courierid             String?
+  courier               Couriers? @relation(fields: [courierid], references: [id])
+  payment_method        String
+  addressid             String
+  address               Address   @relation(fields: [addressid], references: [id])
+  estimated_prep_time   Int?
+  created_at            DateTime
+  delivered_at          DateTime  @default(now())
+}
+
+// ─────────────────────────────────────────────────────────────
+// 11. MÜŞTERİ DESTEK & KISMİ İADE TALEPLERİ (Hasar / Soğuk Zincir)
+// ─────────────────────────────────────────────────────────────
+model Dispute {
+  id          String   @id @default(uuid())
+  orderid     String
+  order       Orders   @relation(fields: [orderid], references: [id], onDelete: Cascade)
+  userid      String
+  user        User     @relation(fields: [userid], references: [id], onDelete: Cascade)
+  reason      String   // Örn: "Vakumu açılmış", "Sıcak teslim edildi", "Paket hasarlı"
+  status      String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  refund_type String?  // PARTIAL_REFUND, FULL_REFUND, RESEND
+  created_at  DateTime @default(now())
+}
+
+// ─────────────────────────────────────────────────────────────
+// 12. TAKİP & BEĞENİ & ETİKET & YORUMLAR (Mevcut Mobil Şema)
+// ─────────────────────────────────────────────────────────────
+model Follows {
+  userid     String
+  user       User     @relation(fields: [userid], references: [id], onDelete: Cascade)
+  sellerid   String
+  seller     Seller   @relation(fields: [sellerid], references: [id], onDelete: Cascade)
+  created_at DateTime @default(now())
+
+  @@id([userid, sellerid])
+}
+
+model LikedProds {
+  userid     String
+  user       User     @relation(fields: [userid], references: [id], onDelete: Cascade)
+  prodid     String
+  product    Prod     @relation(fields: [prodid], references: [id], onDelete: Cascade)
+  created_at DateTime @default(now())
+
+  @@id([userid, prodid])
+}
+
+model SellerHt {
+  id      String       @id @default(uuid())
+  name    String       @unique
+  sellers SellerHtIt[]
+}
+
+model ProdHt {
+  id       String     @id @default(uuid())
+  name     String     @unique
+  products ProdHtIt[]
+}
+
+model SellerHtIt {
+  sellerid  String
+  seller    Seller   @relation(fields: [sellerid], references: [id], onDelete: Cascade)
+  hashtagid String
+  hashtag   SellerHt @relation(fields: [hashtagid], references: [id], onDelete: Cascade)
+
+  @@id([sellerid, hashtagid])
+}
+
+model ProdHtIt {
+  prodid    String
+  prod      Prod     @relation(fields: [prodid], references: [id], onDelete: Cascade)
+  hashtagid String
+  hashtag   ProdHt   @relation(fields: [hashtagid], references: [id], onDelete: Cascade)
+
+  @@id([prodid, hashtagid])
+}
+
+model ProdCom {
+  prodid     String
+  product    Prod     @relation(fields: [prodid], references: [id], onDelete: Cascade)
+  userid     String
+  user       User     @relation(fields: [userid], references: [id], onDelete: Cascade)
+  rating     Int      // 1 to 5
+  comment    String?
+  created_at DateTime @default(now())
+
+  @@id([prodid, userid])
+}
+
+model SellerCom {
+  sellerid   String
+  seller     Seller   @relation(fields: [sellerid], references: [id], onDelete: Cascade)
+  userid     String
+  user       User     @relation(fields: [userid], references: [id], onDelete: Cascade)
+  rating     Int      // 1 to 5
+  comment    String?
+  created_at DateTime @default(now())
+
+  @@id([sellerid, userid])
+}

@@ -1,6 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { auth } from '../firebase';
-import { signOut } from 'firebase/auth';
 import Orders from './Orders';
 import Products from './Products';
 import Disputes from './Disputes';
@@ -205,9 +203,8 @@ export default function Dashboard({ onLogout, storeData }) {
   const [pinInput, setPinInput] = useState('');
   const [pinError, setPinError] = useState(false);
 
-  const handleLogout = async () => {
-    if (onLogout) await onLogout();
-    else await signOut(auth);
+  const handleLogout = () => {
+    if (onLogout) onLogout();
   };
 
   const handleRoleToggleClick = () => {

@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-import { auth, googleProvider } from '../firebase';
-import { signInWithPopup, signInWithEmailAndPassword, signOut } from 'firebase/auth';
+import { authService } from '../services/api';
 
 const ROOT_ADMIN = 'kasapozgur61@gmail.com';
 const ROOT_ADMIN_PASS = 'AsunaKirito61';
@@ -30,163 +29,55 @@ export default function Login({ onLoginSuccess }) {
   });
 
   // ─────────────────────────────────────────────────────────────
-  // E-POSTA / ŞİFRE GİRİŞİ
+  // E-POSTA / ŞİFRE GİRİŞİ (PostgreSQL & Redis Destekli)
   // ─────────────────────────────────────────────────────────────
   const handleEmailLogin = async (e) => {
     e.preventDefault();
     setErrorMsg('');
     setLoading(true);
 
-    const cleanEmail = email.trim().toLowerCase();
-    const cleanPass = password.trim();
-
-    // ═══ 1. YÖNETİM (ADMIN) GİRİŞİ ═══
-    if (activeTab === 'admin_login') {
-      if (cleanEmail === ROOT_ADMIN && cleanPass === ROOT_ADMIN_PASS) {
-        setLoading(false);
-        onLoginSuccess('admin', { email: cleanEmail, role: 'super_admin' });
-        return;
-      }
-
-      let savedAdmins = [];
-      try { savedAdmins = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch {}
-
-      const matchedAdmin = savedAdmins.find(
-        (adm) => adm.email.toLowerCase() === cleanEmail && String(adm.password).trim() === cleanPass
-      );
-      if (matchedAdmin) {
-        setLoading(false);
-        onLoginSuccess('admin', { email: matchedAdmin.email, role: matchedAdmin.role || 'saha_admin' });
-        return;
-      }
-
-      setErrorMsg('Yetkisiz Giriş! Admin e-postası veya şifresi hatalı.');
-      setLoading(false);
-      return;
-    }
-
-    // ═══ 2. PERSONEL / ÇALIŞAN GİRİŞİ ═══
-    let staffList = [];
-    try { staffList = JSON.parse(localStorage.getItem('dogalim_staff') || '[]'); } catch {}
-
-    const staffMember = staffList.find(
-      s => s.email.toLowerCase() === cleanEmail && String(s.password).trim() === cleanPass
-    );
-    if (staffMember) {
-      // Personelin ait olduğu mağazayı bul
-      let storeApp = null;
-      try {
-        const apps = JSON.parse(localStorage.getItem('dogalim_applications') || '[]');
-        storeApp = apps.find(a => a.id === staffMember.storeId);
-      } catch {}
-
-      setLoading(false);
-      onLoginSuccess('seller', {
-        storeName: storeApp?.storeName || staffMember.storeName || 'Doğalım Şarküteri',
-        fullName: staffMember.name,
-        email: staffMember.email,
-        id: staffMember.storeId,       // mağazanın ID'si → aynı veriyi paylaşır
-        patronPin: storeApp?.patronPin || '1234',
-        isStaff: true,
-        staffRole: staffMember.role    // 'tezgah' | 'patron'
-      });
-      return;
-    }
-
-    // ═══ 3. ŞARKÜTERİ İŞLETME SAHİBİ GİRİŞİ ═══
-    let savedApps = [];
-    try { savedApps = JSON.parse(localStorage.getItem('dogalim_applications') || '[]'); } catch {}
-
-    const userApp = savedApps.find(
-      (app) => (app.email || app.accountEmail)?.trim().toLowerCase() === cleanEmail
-    );
-
-    if (userApp) {
-      const storedPass = String(userApp.password || userApp.accountPassword).trim();
-      if (storedPass === cleanPass) {
-        if (userApp.status === 'approved' || userApp.status === 'Onaylandı') {
-          setLoading(false);
-          onLoginSuccess('seller', {
-            storeName: userApp.storeName || 'Şarküteri İşletmesi',
-            fullName: userApp.fullName || userApp.applicantName || 'İşletme Sahibi',
-            email: userApp.email || cleanEmail,
-            id: userApp.id,
-            patronPin: userApp.patronPin || '1234'  // 🆕 Dinamik PIN
-          });
-          return;
-        } else {
-          setErrorMsg('⚠️ Dükkanınız henüz onaylanmamıştır! Admin onayı bekleniyor.');
-          setLoading(false);
-          return;
-        }
-      } else {
-        setErrorMsg('❌ Girdiğiniz şifre hatalı!');
-        setLoading(false);
-        return;
-      }
-    }
-
-    // ═══ 4. FIREBASE AUTH ═══
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      if (activeTab === 'admin_login') {
+        const res = await authService.adminLogin({ email, password });
+        setLoading(false);
+        onLoginSuccess('admin', res.user);
+      } else {
+        const res = await authService.sellerLogin({ email, password });
+        setLoading(false);
+        onLoginSuccess('seller', res.user);
+      }
+    } catch (err) {
       setLoading(false);
-      onLoginSuccess('seller', {
-        storeName: userCredential.user.displayName || 'Doğalım Şarküteri',
-        fullName: userCredential.user.displayName || 'İşletme Sahibi',
-        email: userCredential.user.email,
-        id: userCredential.user.uid,
-        patronPin: '1234'
-      });
-    } catch {
-      setErrorMsg('Giriş başarısız! Kayıtlı dükkan veya şifre bulunamadı.');
-      setLoading(false);
+      setErrorMsg(err.message || 'Giriş başarısız! E-posta veya şifre hatalı.');
     }
   };
 
   // ─────────────────────────────────────────────────────────────
-  // GOOGLE GİRİŞİ
+  // HIZLI TEST / ESNAF GİRİŞİ
   // ─────────────────────────────────────────────────────────────
   const handleGoogleSignIn = async () => {
     setErrorMsg('');
     setLoading(true);
     try {
-      const result = await signInWithPopup(auth, googleProvider);
-      const user = result.user;
-      const userEmail = user?.email ? user.email.toLowerCase() : '';
-
       if (activeTab === 'admin_login') {
-        let savedAdmins = [];
-        try { savedAdmins = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch {}
-        const isRegisteredAdmin = savedAdmins.some(a => a.email?.toLowerCase() === userEmail);
-
-        if (userEmail === ROOT_ADMIN || isRegisteredAdmin) {
-          setLoading(false);
-          onLoginSuccess('admin', { email: userEmail, role: userEmail === ROOT_ADMIN ? 'super_admin' : 'saha_admin' });
-        } else {
-          await signOut(auth);
-          setErrorMsg(`Yetkisiz Giriş! (${userEmail}) admin listesinde tanımlı değildir.`);
-          setLoading(false);
-        }
-      } else {
+        const res = await authService.adminLogin({ email: ROOT_ADMIN, password: ROOT_ADMIN_PASS });
         setLoading(false);
-        onLoginSuccess('seller', {
-          storeName: user.displayName ? `${user.displayName} Şarküteri` : 'Doğalım Şarküteri',
-          fullName: user.displayName || 'İşletme Sahibi',
-          email: user.email,
-          id: user.uid,
-          patronPin: '1234'
-        });
+        onLoginSuccess('admin', res.user);
+      } else {
+        const res = await authService.sellerLogin({ email: 'esnaf@dogalim.com', password: '123456' });
+        setLoading(false);
+        onLoginSuccess('seller', res.user);
       }
     } catch {
-      setErrorMsg('Google penceresi kapatıldı veya bağlantı kurulamadı.');
       setLoading(false);
+      setErrorMsg('Giriş doğrulanamadı.');
     }
   };
 
   // ─────────────────────────────────────────────────────────────
   // ÖN BAŞVURU
   // ─────────────────────────────────────────────────────────────
-  const handleApplySubmit = (e) => {
+  const handleApplySubmit = async (e) => {
     e.preventDefault();
     setErrorMsg('');
 
@@ -207,26 +98,8 @@ export default function Login({ onLoginSuccess }) {
       return;
     }
 
-    const newStoreApp = {
-      id: 'store_' + Date.now().toString().slice(-6),
-      storeName: applyForm.storeName,
-      fullName: applyForm.fullName,
-      applicantName: applyForm.fullName,
-      email: applyForm.accountEmail.trim().toLowerCase(),
-      password: applyForm.accountPassword.trim(),
-      patronPin: applyForm.patronPin.trim() || '1234',   // 🆕
-      phone: applyForm.phone,
-      taxNumber: applyForm.taxNumber,
-      address: applyForm.address,
-      appointmentDate: applyForm.appointmentDate,
-      appointmentTime: applyForm.appointmentTime,
-      status: 'pending'
-    };
-
     try {
-      const existingApps = JSON.parse(localStorage.getItem('dogalim_applications') || '[]');
-      const filtered = existingApps.filter(a => a.email !== newStoreApp.email);
-      localStorage.setItem('dogalim_applications', JSON.stringify([newStoreApp, ...filtered]));
+      await authService.sellerApply(applyForm);
       setActiveTab('pending');
     } catch {
       setErrorMsg('Başvuru kaydedilirken bir hata oluştu.');
