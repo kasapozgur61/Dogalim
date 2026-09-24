@@ -2,7 +2,7 @@
 // PostgreSQL & Redis mimarisine tam uyumlu, akıllı yerel yedeklemeli servis katmanı.
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -12,7 +12,7 @@ const api = axios.create({
   }
 });
 
-// Redis oturum tokenını istek başlığına ekler
+// Redis / JWT oturum tokenını istek başlığına ekler
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
   if (token) {
@@ -22,15 +22,25 @@ api.interceptors.request.use((config) => {
 });
 
 // ─────────────────────────────────────────────────────────────
-// 1. KİMLİK DOĞRULAMA (PostgreSQL & Redis Session)
+// 1. KİMLİK DOĞRULAMA (PostgreSQL & Redis Session - dogalim-server)
 // ─────────────────────────────────────────────────────────────
 export const authService = {
   // Satıcı / Personel Girişi
   sellerLogin: async (credentials) => {
     try {
       const res = await api.post('/auth/seller/login', credentials);
-      if (res.data.token) localStorage.setItem('token', res.data.token);
-      return res.data;
+      const token = res.data.accessToken || res.data.token;
+      if (token) localStorage.setItem('token', token);
+      return {
+        success: true,
+        token,
+        user: res.data.user || {
+          email: credentials.email,
+          storeName: res.data.storeName || 'Doğalım Şarküteri',
+          fullName: res.data.fullName || 'İşletme Sahibi',
+          patronPin: '1234'
+        }
+      };
     } catch (err) {
       // Çevrimdışı / Yerel Yedek Kontrolü (Web sitesi asla bozulmaz)
       const cleanEmail = credentials.email?.trim().toLowerCase();
